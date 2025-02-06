@@ -23,13 +23,49 @@ model User {
 
 model Candidate {
   id        Int      @id @default(autoincrement())
-  name      String
-  email     String
-  number    String
+  firstName String   // first name is compulsory
+  lastName  String   // last name is compulsory
+  email     String   @unique  // email is compulsory
+  mobile_number    String   // number is compulsory
   createdAt DateTime @default(now())
-
+  
+  dateOfBirth DateTime? // Optional
+  
   userId    Int?     @map("user_id")
   user      User?    @relation("UserCandidates", fields: [userId], references: [id])
-
+  
+  educations        Education[]        @relation("CandidateEducations")
+  previousEmployers PreviousEmployer[] @relation("CandidateEmployers")
+  
   @@map("candidates")
 }
+
+
+model Education {
+  id             Int      @id @default(autoincrement())
+  institution    String
+  qualification  String
+  contactPerson  String
+  contactEmail   String
+  contactPhone   String
+  
+  candidateId    Int      @map("candidate_id")
+  candidate      Candidate @relation("CandidateEducations", fields: [candidateId], references: [id])
+  
+  @@map("educations")
+}
+
+model PreviousEmployer {
+  id             Int      @id @default(autoincrement())
+  companyName    String
+  position       String
+  contactPerson  String
+  contactEmail   String
+  contactPhone   String
+  
+  candidateId    Int      @map("candidate_id")
+  candidate      Candidate @relation("CandidateEmployers", fields: [candidateId], references: [id])
+  
+  @@map("previous_employers")
+}
+
