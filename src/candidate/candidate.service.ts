@@ -1,11 +1,10 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { CreateCandidateDto } from './dto/create-candidate.dto'; // DTO for creating a candidate
-import { UpdateCandidateDto } from './dto/update-candidate.dto'; // DTO for updating a candidate
+import { CreateCandidateDto } from './dto/create-candidate.dto';
+import { UpdateCandidateDto } from './dto/update-candidate.dto';
 import { SendEmailDto } from './dto/send-email.dto';
-import { PrismaService } from '../prisma/prisma.service'
+import { PrismaService } from '../prisma/prisma.service';
 import * as nodemailer from 'nodemailer';
-import { ConfigService } from '@nestjs/config'; // Import ConfigService
-// Make sure this is properly imported
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class CandidateService {
@@ -14,43 +13,39 @@ export class CandidateService {
     private readonly config: ConfigService
   ) { }
 
-  // Create a new candidate with only basic information (first name, last name, email, number)
+  // Create a new candidate
   async create(createCandidateDto: CreateCandidateDto, userId: number) {
-    // Step 1: Find the user by userId
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
-    if (!user) {
-      throw new NotFoundException('User not found');
-    }
+    if (!user) throw new NotFoundException('User not found');
 
-    // Step 2: Create the candidate with the provided basic info
     const candidate = await this.prisma.candidate.create({
       data: {
         firstName: createCandidateDto.firstName,
         lastName: createCandidateDto.lastName,
         email: createCandidateDto.email,
         mobile_number: createCandidateDto.mobile_number,
-        user: {
-          connect: { id: userId }, // Link the candidate to the user
-        },
+        user: { connect: { id: userId } },
       },
     });
 
-    // Step 3: Send email to the candidate for updating their profile
     await this.sendCreationEmail(candidate);
 
-    return candidate;
+    return {
+      success: true,
+      message: 'Candidate created successfully. Email sent for profile update.',
+      data: candidate,
+    };
   }
 
   private async sendCreationEmail(candidate: SendEmailDto) {
     const transporter = nodemailer.createTransport({
       service: 'Gmail',
       auth: {
-        user: this.config.get('HOST_EMAIL'), // Your email
+        user: this.config.get('HOST_EMAIL'),
         pass: this.config.get('HOST_PASSWORD'),
       },
     });
 
-    // URL format for updating the profile
     const updateLink = `${this.config.get('APP_URL')}/update_candidate/${candidate.userId}/candidate/${candidate.id}`;
 
     const mailOptions = {
@@ -73,24 +68,14 @@ export class CandidateService {
     }
   }
 
-  // Update other fields for the candidate (dateOfBirth, educations, previousEmployers, etc.)
+  // Update candidate details
   async update(userId: number, candidateId: number, updateCandidateDto: UpdateCandidateDto) {
-    // Ensure the user exists
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
-    if (!user) {
-      throw new NotFoundException('User not found');
-    }
+    if (!user) throw new NotFoundException('User not found');
 
-    // Ensure the candidate exists and belongs to the user
-    const candidate = await this.prisma.candidate.findUnique({
-      where: { id: candidateId },
-    });
+    const candidate = await this.prisma.candidate.findUnique({ where: { id: candidateId } });
+    if (!candidate || candidate.userId !== userId) throw new NotFoundException('Candidate not found');
 
-    if (!candidate || candidate.userId !== userId) {
-      throw new NotFoundException('Candidate not found');
-    }
-
-    // Perform the update
     const updatedCandidate = await this.prisma.candidate.update({
       where: { id: candidateId },
       data: {
@@ -100,7 +85,6 @@ export class CandidateService {
         lastName: updateCandidateDto.lastName,
         dateOfBirth: updateCandidateDto.dateOfBirth,
 
-        // Insert new education records
         educations: {
           create: updateCandidateDto.educations.map((education) => ({
             institution: education.institution,
@@ -111,7 +95,6 @@ export class CandidateService {
           })),
         },
 
-        // Insert new previous employer records
         previousEmployers: {
           create: updateCandidateDto.previousEmployers.map((employer) => ({
             companyName: employer.companyName,
@@ -122,61 +105,57 @@ export class CandidateService {
           })),
         },
       },
-      include: {
-        educations: true, // Include newly created education records
-        previousEmployers: true, // Include newly created previous employer records
-      },
+      include: { educations: true, previousEmployers: true },
     });
 
-    // Return the updated candidate data with the related educations and employers
-    return updatedCandidate;
+    return {
+      success: true,
+      message: 'Candidate updated successfully.',
+      data: updatedCandidate,
+    };
   }
 
-  // Get all candidates under a specific user
+  // Get all candidates under a user
   async findAllByUserId(userId: number) {
-    const candidates = await this.prisma.candidate.findMany({
-      where: { userId }, // Find candidates related to the user
-    });
+    const candidates = await this.prisma.candidate.findMany({ where: { userId } });
+    if (!candidates.length) throw new NotFoundException('No candidates found for this user');
 
-    if (!candidates || candidates.length === 0) {
-      throw new NotFoundException('No candidates found for this user');
-    }
-
-    return candidates;
+    return {
+      success: true,
+      message: 'Candidates retrieved successfully.',
+      data: candidates,
+    };
   }
 
-  // Get one candidate by ID under a specific user
+  // Get a candidate by ID under a user
   async findOne(userId: number, candidateId: number) {
     const candidate = await this.prisma.candidate.findFirst({
-      where: {
-        id: candidateId,
-        userId, // Ensures candidate is associated with the correct user
-      },
+      where: { id: candidateId, userId },
+      include: { previousEmployers: true, educations : true }, // If there are relations
     });
 
-    if (!candidate) {
-      throw new NotFoundException('Candidate not found');
-    }
+    if (!candidate) throw new NotFoundException('Candidate not found');
 
-    return candidate;
+    return {
+      success: true,
+      message: 'Candidate retrieved successfully.',
+      data: candidate,
+    };
   }
 
-  // Delete a candidate under a specific user
+  // Delete a candidate under a user
   async remove(userId: number, candidateId: number) {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
-    if (!user) {
-      throw new NotFoundException('User not found');
-    }
+    if (!user) throw new NotFoundException('User not found');
 
-    const candidate = await this.prisma.candidate.findUnique({
-      where: { id: candidateId },
-    });
-    if (!candidate || candidate.userId !== userId) {
-      throw new NotFoundException('Candidate not found');
-    }
+    const candidate = await this.prisma.candidate.findUnique({ where: { id: candidateId } });
+    if (!candidate || candidate.userId !== userId) throw new NotFoundException('Candidate not found');
 
-    return this.prisma.candidate.delete({
-      where: { id: candidateId },
-    });
+    await this.prisma.candidate.delete({ where: { id: candidateId } });
+
+    return {
+      success: true,
+      message: 'Candidate deleted successfully.',
+    };
   }
 }

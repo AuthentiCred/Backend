@@ -23,3 +23,16 @@ export class loginDto {
   @IsNotEmpty()
   password: string;
 }
+
+export class userDto {
+  @IsEmail()
+  @IsNotEmpty()
+  email: string;
+
+  @IsString()
+  @IsNotEmpty()
+  name: string;
+  
+  @IsNotEmpty()
+  id:number
+}

@@ -16,4 +16,6 @@ export class CreateCandidateDto {
   @IsString()
   @IsNotEmpty()
   lastName: string;
+
+  isVerified:boolean;
 }

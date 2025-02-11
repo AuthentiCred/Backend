@@ -36,6 +36,7 @@ model Candidate {
   
   educations        Education[]        @relation("CandidateEducations")
   previousEmployers PreviousEmployer[] @relation("CandidateEmployers")
+  isVerified Boolean @default(false)
   
   @@map("candidates")
 }
@@ -51,6 +52,7 @@ model Education {
   
   candidateId    Int      @map("candidate_id")
   candidate      Candidate @relation("CandidateEducations", fields: [candidateId], references: [id])
+  isVerified     Boolean @default(false)
   
   @@map("educations")
 }
@@ -62,7 +64,8 @@ model PreviousEmployer {
   contactPerson  String
   contactEmail   String
   contactPhone   String
-  
+  isVerified Boolean @default(false)
+
   candidateId    Int      @map("candidate_id")
   candidate      Candidate @relation("CandidateEmployers", fields: [candidateId], references: [id])
   

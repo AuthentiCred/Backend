@@ -67,6 +67,8 @@ export class UpdateCandidateDto {
   @Type(() => Date) // Make sure the date is parsed correctly
   dateOfBirth: Date;
 
+  isVerified: boolean;
+
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => EducationDto)
