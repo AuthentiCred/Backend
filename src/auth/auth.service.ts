@@ -14,6 +14,7 @@ export class AuthService {
     private config: ConfigService,
   ) { }
 
+  // Signup method
   async signup(dto: AuthDto) {
     const hash = await argon.hash(dto.password);
     try {
@@ -35,20 +36,30 @@ export class AuthService {
     }
   }
 
+  // Signin method
   async signin(dto: loginDto) {
     const user = await this.prisma.user.findUnique({
       where: { email: dto.email },
     });
+
     if (!user) throw new ForbiddenException('Credentials incorrect');
+
     const pwMatches = await argon.verify(user.hash, dto.password);
     if (!pwMatches) throw new ForbiddenException('Credentials incorrect');
+
     return this.signToken(user.id, user.email);
   }
 
-  async signToken(userId: number, email: string): Promise<{ access_token: string; success: boolean, user: userDto }> {
+  // Generate JWT Token with longer expiration (2 days)
+  async signToken(userId: number, email: string): Promise<{ access_token: string; success: boolean; user: userDto }> {
     const payload = { sub: userId, email };
     const secret = this.config.get('JWT_SECRET');
-    const token = await this.jwt.signAsync(payload, { expiresIn: '15m', secret });
+
+    const token = await this.jwt.signAsync(payload, {
+      expiresIn: '2d', // Token valid for 2 days
+      secret,
+    });
+
     const user = await this.prisma.user.findUnique({
       where: { email: email },
       select: {
@@ -56,6 +67,22 @@ export class AuthService {
         email: true,
         id: true,
       }
-    }); return { access_token: token, success: true, user: user };
+    });
+
+    return { access_token: token, success: true, user };
+  }
+
+  // Validate user using the stored token // Validate user using the stored token
+  async validateUser(token: string) {
+    try {
+      const decoded = await this.jwt.verifyAsync(token);
+      const user = await this.prisma.user.findUnique({
+        where: { id: decoded.sub },
+        select: { id: true, email: true, name: true },
+      });
+      return user || null;
+    } catch (error) {
+      return error || null;
+    }
   }
 }
